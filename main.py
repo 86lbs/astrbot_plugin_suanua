@@ -11,6 +11,52 @@ from astrbot.api import logger
 from astrbot.api.message_components import Reply
 
 
+# 八卦线条映射
+TRIGRAM_LINES = {
+    "☰": ["━━━", "━━━", "━━━"],  # 乾
+    "☷": ["━ ━", "━ ━", "━ ━"],  # 坤
+    "☳": ["━ ━", "━ ━", "━━━"],  # 震
+    "☶": ["━━━", "━ ━", "━ ━"],  # 艮
+    "☲": ["━━━", "━ ━", "━━━"],  # 离
+    "☵": ["━ ━", "━━━", "━ ━"],  # 坎
+    "☱": ["━━━", "━━━", "━ ━"],  # 兑
+    "☴": ["━ ━", "━━━", "━━━"],  # 巽
+}
+
+# 八卦符号到名称的映射
+TRIGRAM_NAMES = {
+    "☰": "乾", "☷": "坤", "☳": "震", "☶": "艮",
+    "☲": "离", "☵": "坎", "☱": "兑", "☴": "巽"
+}
+
+
+def get_hexagram_display(hexagram_data: dict) -> str:
+    """
+    将卦象转换为六行显示格式
+    """
+    gua_xiang = hexagram_data.get("卦象", "")
+    
+    # 如果卦象是单卦符号（如☰），直接显示
+    if len(gua_xiang) == 1 and gua_xiang in TRIGRAM_LINES:
+        lines = TRIGRAM_LINES[gua_xiang]
+        return "\n".join(lines)
+    
+    # 如果卦象是两个八卦符号组合（如☰☷），显示六行
+    if len(gua_xiang) == 2:
+        upper = gua_xiang[0]  # 上卦
+        lower = gua_xiang[1]  # 下卦
+        
+        upper_lines = TRIGRAM_LINES.get(upper, ["?", "?", "?"])
+        lower_lines = TRIGRAM_LINES.get(lower, ["?", "?", "?"])
+        
+        # 上卦在上，下卦在下
+        all_lines = upper_lines + lower_lines
+        return "\n".join(all_lines)
+    
+    # 默认返回原卦象
+    return gua_xiang
+
+
 # 六十四卦数据
 SIXTY_FOUR_HEXAGRAMS = {
     "乾": {"卦象": "☰", "性质": "纯阳", "含义": "天行健，君子以自强不息。大吉大利，万事亨通。", "爻辞": ["初九：潜龙勿用。", "九二：见龙在田，利见大人。", "九三：君子终日乾乾，夕惕若，厉无咎。", "九四：或跃在渊，无咎。", "九五：飞龙在天，利见大人。", "上九：亢龙有悔。"]},
@@ -160,7 +206,6 @@ class SuanuaPlugin(Star):
     def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
         """本地生成解卦结果"""
         lines = []
-        lines.append(f"【{hexagram_name}卦】{hexagram_data['卦象']}")
         lines.append(f"卦性：{hexagram_data['性质']}")
         lines.append(f"含义：{hexagram_data['含义']}")
         
@@ -239,9 +284,12 @@ class SuanuaPlugin(Star):
             
             interpretation = await self._get_ai_interpretation(hexagram_name, hexagram_data, question, target_name)
             
-            # 构建输出
-            result = "【易经算卦】\n\n"
-            result += f"卦名：{hexagram_name}卦 {hexagram_data['卦象']}\n"
+            # 获取卦象的六行显示
+            hexagram_display = get_hexagram_display(hexagram_data)
+            
+            # 构建输出 - 精简版
+            result = f"【{hexagram_name}卦】\n"
+            result += f"{hexagram_display}\n"
             result += f"卦性：{hexagram_data['性质']}\n"
             
             if target_name:
@@ -268,8 +316,10 @@ class SuanuaPlugin(Star):
             return
         
         hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
+        hexagram_display = get_hexagram_display(hexagram_data)
         
-        result = f"【{hexagram_name}卦】{hexagram_data['卦象']}\n\n"
+        result = f"【{hexagram_name}卦】\n"
+        result += f"{hexagram_display}\n\n"
         result += f"性质：{hexagram_data['性质']}\n"
         result += f"含义：{hexagram_data['含义']}\n\n"
         result += "爻辞：\n"
