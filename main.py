@@ -321,15 +321,18 @@ class SuanuaPlugin(Star):
         
         hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
         
+        # 发送等待提示
+        await event.send(event.plain_result(f"🔮 正在为您AI解卦【{hexagram_name}卦】，请稍候..."))
+        
         # 调用AI解卦
         ai_result = await self._get_ai_interpretation(event, hexagram_name, hexagram_data)
         
         # 构建输出
         hexagram_display = get_hexagram_display(hexagram_data)
-        result = f"【{hexagram_name}卦】\n"
+        result = f"【{hexagram_name}卦 · AI解卦】\n"
         result += f"{hexagram_display}\n"
         result += f"卦性：{hexagram_data['性质']}\n"
-        result += f"\n【AI解卦】\n{ai_result}"
+        result += f"\n{ai_result}"
         
         # 引用原消息回复
         if reply_msg:
