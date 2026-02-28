@@ -8,7 +8,7 @@ import random
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger
-from astrbot.api.message_components import Reply, Plain
+from astrbot.api.message_components import Reply
 
 
 # 八卦线条映射
@@ -206,8 +206,8 @@ class SuanuaPlugin(Star):
                             reply_text += comp.text
                         elif hasattr(comp, 'plain'):
                             reply_text += str(comp)
-                return True, reply_text.strip(), msg
-        return False, "", None
+                return True, reply_text.strip()
+        return False, ""
     
     async def _get_ai_interpretation(self, event: AstrMessageEvent, hexagram_name: str, hexagram_data: dict) -> str:
         """调用 AI 进行解卦"""
@@ -302,7 +302,7 @@ class SuanuaPlugin(Star):
         logger.info("收到AI解卦请求")
         
         # 检查是否有引用消息
-        has_reply, reply_content, reply_msg = self._get_reply_content(event)
+        has_reply, reply_content = self._get_reply_content(event)
         
         if not has_reply or not reply_content:
             yield event.plain_result("请引用算卦结果后再发送「ai解卦」")
@@ -334,11 +334,7 @@ class SuanuaPlugin(Star):
         result += f"卦性：{hexagram_data['性质']}\n"
         result += f"\n{ai_result}"
         
-        # 引用原消息回复
-        if reply_msg:
-            yield event.chain_result([reply_msg, Plain(result)])
-        else:
-            yield event.plain_result(result)
+        yield event.plain_result(result)
     
     @filter.command("卦象")
     async def hexagram_info(self, event: AstrMessageEvent):
