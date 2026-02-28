@@ -8,7 +8,7 @@ import random
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
-from astrbot.api.message_components import Reply
+from astrbot.api.message_components import Reply, Plain
 
 
 # 八卦线条映射
@@ -23,37 +23,23 @@ TRIGRAM_LINES = {
     "☴": ["━ ━", "━━━", "━━━"],  # 巽
 }
 
-# 八卦符号到名称的映射
-TRIGRAM_NAMES = {
-    "☰": "乾", "☷": "坤", "☳": "震", "☶": "艮",
-    "☲": "离", "☵": "坎", "☱": "兑", "☴": "巽"
-}
-
 
 def get_hexagram_display(hexagram_data: dict) -> str:
-    """
-    将卦象转换为六行显示格式
-    """
+    """将卦象转换为六行显示格式"""
     gua_xiang = hexagram_data.get("卦象", "")
     
-    # 如果卦象是单卦符号（如☰），直接显示
     if len(gua_xiang) == 1 and gua_xiang in TRIGRAM_LINES:
         lines = TRIGRAM_LINES[gua_xiang]
         return "\n".join(lines)
     
-    # 如果卦象是两个八卦符号组合（如☰☷），显示六行
     if len(gua_xiang) == 2:
-        upper = gua_xiang[0]  # 上卦
-        lower = gua_xiang[1]  # 下卦
-        
+        upper = gua_xiang[0]
+        lower = gua_xiang[1]
         upper_lines = TRIGRAM_LINES.get(upper, ["?", "?", "?"])
         lower_lines = TRIGRAM_LINES.get(lower, ["?", "?", "?"])
-        
-        # 上卦在上，下卦在下
         all_lines = upper_lines + lower_lines
         return "\n".join(all_lines)
     
-    # 默认返回原卦象
     return gua_xiang
 
 
@@ -138,10 +124,10 @@ class SuanuaPlugin(Star):
         """插件初始化"""
         logger.info("算卦插件已加载")
     
-    def _get_reply_content(self, event: AstrMessageEvent) -> tuple:
+    def _get_reply_info(self, event: AstrMessageEvent) -> tuple:
         """
-        获取引用消息的内容
-        返回: (是否有引用, 引用消息内容, 引用者名称)
+        获取引用消息的信息
+        返回: (是否有引用, 引用消息内容, 引用者名称, 引用消息对象)
         """
         messages = event.get_messages()
         for msg in messages:
@@ -154,13 +140,24 @@ class SuanuaPlugin(Star):
                             reply_text += comp.text
                         elif hasattr(comp, 'plain'):
                             reply_text += str(comp)
-                # 获取引用者名称
-                sender_name = ""
-                if hasattr(msg, 'sender') and msg.sender:
-                    sender_name = getattr(msg.sender, 'nickname', "") or getattr(msg.sender, 'name', "")
                 
-                return True, reply_text.strip(), sender_name
-        return False, "", ""
+                # 获取引用者名称 - 尝试多种方式
+                sender_name = ""
+                if hasattr(msg, 'sender'):
+                    sender = msg.sender
+                    if sender:
+                        # 尝试不同的属性名
+                        sender_name = (
+                            getattr(sender, 'nickname', None) or
+                            getattr(sender, 'nick', None) or
+                            getattr(sender, 'name', None) or
+                            getattr(sender, 'display_name', None) or
+                            getattr(sender, 'card', None) or
+                            ""
+                        )
+                
+                return True, reply_text.strip(), sender_name, msg
+        return False, "", "", None
     
     async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
         """调用 AI 进行解卦"""
@@ -171,6 +168,7 @@ class SuanuaPlugin(Star):
             if self._support_ai is None:
                 return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
             
+            # 构建提示词，告知AI求卦者和求卦内容
             prompt = f"""你是一位精通易经的大师，请为求卦者解卦。
 
 卦名：{hexagram_name}
@@ -185,7 +183,7 @@ class SuanuaPlugin(Star):
             if question:
                 prompt += f"求卦内容：{question}\n\n"
             
-            prompt += """请根据以上信息，为求卦者提供详细的解卦分析。请用通俗易懂的语言，给出积极正面的指引，帮助求卦者趋吉避凶。"""
+            prompt += """请根据以上信息，为求卦者提供详细的解卦分析。请用通俗易懂的语言，给出积极正面的指引，帮助求卦者趋吉避凶。注意：在回复中不要重复提及求卦者和求卦内容，直接进行解卦即可。"""
 
             response = await self._support_ai.chat_completion(
                 messages=[
@@ -208,12 +206,6 @@ class SuanuaPlugin(Star):
         lines = []
         lines.append(f"卦性：{hexagram_data['性质']}")
         lines.append(f"含义：{hexagram_data['含义']}")
-        
-        if target_name:
-            lines.append(f"求卦者：{target_name}")
-        
-        if question:
-            lines.append(f"求卦内容：{question}")
         
         yao_ci = random.choice(hexagram_data['爻辞'])
         lines.append(f"爻辞：{yao_ci}")
@@ -260,7 +252,7 @@ class SuanuaPlugin(Star):
         logger.info(f"收到算卦请求: {message}")
         
         # 检查是否有引用消息
-        has_reply, reply_content, reply_sender = self._get_reply_content(event)
+        has_reply, reply_content, reply_sender, reply_msg = self._get_reply_info(event)
         
         question = None
         target_name = None
@@ -287,18 +279,19 @@ class SuanuaPlugin(Star):
             # 获取卦象的六行显示
             hexagram_display = get_hexagram_display(hexagram_data)
             
-            # 构建输出 - 精简版
+            # 构建输出 - 不显示求卦者和求卦内容
             result = f"【{hexagram_name}卦】\n"
             result += f"{hexagram_display}\n"
             result += f"卦性：{hexagram_data['性质']}\n"
-            
-            if target_name:
-                result += f"求卦者：{target_name}\n"
-            
             result += f"\n【解卦】\n{interpretation}\n\n"
             result += "提示：卦象仅供参考，命运掌握在自己手中！"
             
-            yield event.plain_result(result)
+            # 如果是帮别人算卦，引用原消息
+            if has_reply and reply_msg:
+                # 构建消息链：先引用，再发送文本
+                yield event.chain_result([reply_msg, Plain(result)])
+            else:
+                yield event.plain_result(result)
             
         except Exception as e:
             logger.error(f"算卦过程出错: {e}")
