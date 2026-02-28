@@ -1,4 +1,4 @@
-name: suanua_plugin
+name: astrbot_plugin_suanua
 version: 1.0.0
 description: 易经算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
 author: 86lbs
