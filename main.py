@@ -1,7 +1,7 @@
 """
 AstrBot 算卦插件
-用户发送 "算一卦" 触发本插件，生成卦象并调用 AI 解卦
-支持引用消息帮别人算卦
+用户发送 "算一卦" 触发本插件，生成卦象并输出本地解卦
+引用输出内容发送 "ai解卦" 进行AI解卦
 """
 
 import random
@@ -112,7 +112,7 @@ SIXTY_FOUR_HEXAGRAMS = {
 }
 
 
-@register("astrbot_plugin_suanua", "86lbs", "易经算卦插件 - 用户发送算一卦触发，生成卦象并调用AI解卦", "1.0.0")
+@register("astrbot_plugin_suanua", "86lbs", "易经算卦插件", "v1.0.0")
 class SuanuaPlugin(Star):
     """算卦插件"""
     
@@ -124,15 +124,11 @@ class SuanuaPlugin(Star):
         """插件初始化"""
         logger.info("算卦插件已加载")
     
-    def _get_reply_info(self, event: AstrMessageEvent) -> tuple:
-        """
-        获取引用消息的信息
-        返回: (是否有引用, 引用消息内容, 引用者名称, 引用消息对象)
-        """
+    def _get_reply_content(self, event: AstrMessageEvent) -> tuple:
+        """获取引用消息的内容"""
         messages = event.get_messages()
         for msg in messages:
             if isinstance(msg, Reply):
-                # 获取引用消息的文本内容
                 reply_text = ""
                 if hasattr(msg, 'chain') and msg.chain:
                     for comp in msg.chain:
@@ -140,36 +136,19 @@ class SuanuaPlugin(Star):
                             reply_text += comp.text
                         elif hasattr(comp, 'plain'):
                             reply_text += str(comp)
-                
-                # 获取引用者名称 - 尝试多种方式
-                sender_name = ""
-                if hasattr(msg, 'sender'):
-                    sender = msg.sender
-                    if sender:
-                        # 尝试不同的属性名
-                        sender_name = (
-                            getattr(sender, 'nickname', None) or
-                            getattr(sender, 'nick', None) or
-                            getattr(sender, 'name', None) or
-                            getattr(sender, 'display_name', None) or
-                            getattr(sender, 'card', None) or
-                            ""
-                        )
-                
-                return True, reply_text.strip(), sender_name, msg
-        return False, "", "", None
+                return True, reply_text.strip(), msg
+        return False, "", None
     
-    async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
+    async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
         """调用 AI 进行解卦"""
         try:
             if self._support_ai is None:
                 self._support_ai = self.context.get_llm()
             
             if self._support_ai is None:
-                return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
+                return "AI服务暂不可用，请稍后再试。"
             
-            # 构建提示词，告知AI求卦者和求卦内容
-            prompt = f"""你是一位精通易经的大师，请为求卦者解卦。
+            prompt = f"""你是一位精通易经的大师，请根据以下卦象为求卦者解卦。
 
 卦名：{hexagram_name}
 卦象：{hexagram_data['卦象']}
@@ -177,17 +156,14 @@ class SuanuaPlugin(Star):
 基本含义：{hexagram_data['含义']}
 
 """
-            if target_name:
-                prompt += f"求卦者：{target_name}\n"
-            
             if question:
                 prompt += f"求卦内容：{question}\n\n"
             
-            prompt += """请根据以上信息，为求卦者提供详细的解卦分析。请用通俗易懂的语言，给出积极正面的指引，帮助求卦者趋吉避凶。注意：在回复中不要重复提及求卦者和求卦内容，直接进行解卦即可。"""
+            prompt += """请提供详细的解卦分析，用通俗易懂的语言，给出积极正面的指引。"""
 
             response = await self._support_ai.chat_completion(
                 messages=[
-                    {"role": "system", "content": "你是一位精通易经的算命大师，擅长用通俗易懂的语言为人们解卦指引。你的解读总是积极正面，给人希望和方向。"},
+                    {"role": "system", "content": "你是一位精通易经的算命大师，擅长用通俗易懂的语言为人们解卦指引。"},
                     {"role": "user", "content": prompt}
                 ]
             )
@@ -195,13 +171,13 @@ class SuanuaPlugin(Star):
             if response and hasattr(response, 'choices') and response.choices:
                 return response.choices[0].message.content
             else:
-                return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
+                return "AI解卦失败，请稍后再试。"
                 
         except Exception as e:
             logger.error(f"AI 解卦失败: {e}")
-            return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
+            return f"AI解卦出错：{str(e)}"
     
-    def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
+    def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict) -> str:
         """本地生成解卦结果"""
         lines = []
         lines.append(f"卦性：{hexagram_data['性质']}")
@@ -224,82 +200,82 @@ class SuanuaPlugin(Star):
         
         return "\n".join(lines)
     
-    def _generate_detailed_hexagram(self) -> tuple:
-        """生成详细的卦象"""
-        yao_results = []
-        for i in range(6):
-            coins = [random.choice([0, 1]) for _ in range(3)]
-            total = sum(coins)
-            if total == 3:
-                yao_results.append(9)
-            elif total == 0:
-                yao_results.append(6)
-            elif total == 2:
-                yao_results.append(7)
-            else:
-                yao_results.append(8)
-        
+    def _generate_hexagram(self) -> tuple:
+        """生成卦象"""
         hexagram_name = random.choice(list(SIXTY_FOUR_HEXAGRAMS.keys()))
         hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
-        changing_yao = [i for i, yao in enumerate(yao_results) if yao in [6, 9]]
-        
-        return hexagram_name, hexagram_data, yao_results, changing_yao
+        return hexagram_name, hexagram_data
 
     @filter.command("算一卦")
     async def divine(self, event: AstrMessageEvent):
-        """算一卦 - 随机起卦并获取AI解卦结果，支持引用消息帮别人算卦"""
+        """算一卦 - 生成卦象并输出本地解卦（不使用AI）"""
         message = event.message_str
         logger.info(f"收到算卦请求: {message}")
         
+        # 生成卦象
+        hexagram_name, hexagram_data = self._generate_hexagram()
+        hexagram_display = get_hexagram_display(hexagram_data)
+        
+        # 生成本地解卦
+        interpretation = self._generate_local_interpretation(hexagram_name, hexagram_data)
+        
+        # 构建输出
+        result = f"【{hexagram_name}卦】\n"
+        result += f"{hexagram_display}\n"
+        result += f"卦性：{hexagram_data['性质']}\n"
+        result += f"\n{interpretation}\n\n"
+        result += "💡 引用此消息发送「ai解卦」可获取AI详细解读"
+        
+        yield event.plain_result(result)
+    
+    @filter.command("ai解卦")
+    async def ai_divine(self, event: AstrMessageEvent):
+        """ai解卦 - 引用算卦结果进行AI解卦"""
+        message = event.message_str
+        logger.info(f"收到AI解卦请求: {message}")
+        
         # 检查是否有引用消息
-        has_reply, reply_content, reply_sender, reply_msg = self._get_reply_info(event)
+        has_reply, reply_content, reply_msg = self._get_reply_content(event)
         
-        question = None
-        target_name = None
+        if not has_reply or not reply_content:
+            yield event.plain_result("请引用算卦结果后再发送「ai解卦」")
+            return
         
-        if has_reply and reply_content:
-            # 有引用消息，帮别人算卦
-            target_name = reply_sender if reply_sender else "某人"
-            question = reply_content
-            logger.info(f"帮 {target_name} 算卦，内容: {question}")
+        # 从引用内容中解析卦名
+        hexagram_name = None
+        for name in SIXTY_FOUR_HEXAGRAMS.keys():
+            if f"【{name}卦】" in reply_content:
+                hexagram_name = name
+                break
+        
+        if not hexagram_name:
+            yield event.plain_result("无法识别引用的卦象，请引用正确的算卦结果")
+            return
+        
+        hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
+        
+        # 发送等待提示
+        await event.send(event.plain_result("正在为您AI解卦，请稍候..."))
+        
+        # 调用AI解卦
+        ai_result = await self._get_ai_interpretation(hexagram_name, hexagram_data)
+        
+        # 构建输出
+        hexagram_display = get_hexagram_display(hexagram_data)
+        result = f"【{hexagram_name}卦】\n"
+        result += f"{hexagram_display}\n"
+        result += f"卦性：{hexagram_data['性质']}\n"
+        result += f"\n【AI解卦】\n{ai_result}"
+        
+        # 引用原消息回复
+        if reply_msg:
+            yield event.chain_result([reply_msg, Plain(result)])
         else:
-            # 没有引用消息，正常算卦
-            if len(message) > 3:
-                question = message[3:].strip()
-                if question.startswith("算一卦"):
-                    question = question[3:].strip()
-        
-        try:
-            hexagram_name, hexagram_data, yao_results, changing_yao = self._generate_detailed_hexagram()
-            
-            await event.send(event.plain_result("正在为您起卦解卦，请稍候..."))
-            
-            interpretation = await self._get_ai_interpretation(hexagram_name, hexagram_data, question, target_name)
-            
-            # 获取卦象的六行显示
-            hexagram_display = get_hexagram_display(hexagram_data)
-            
-            # 构建输出 - 不显示求卦者和求卦内容
-            result = f"【{hexagram_name}卦】\n"
-            result += f"{hexagram_display}\n"
-            result += f"卦性：{hexagram_data['性质']}\n"
-            result += f"\n【解卦】\n{interpretation}\n\n"
-            result += "提示：卦象仅供参考，命运掌握在自己手中！"
-            
-            # 如果是帮别人算卦，引用原消息
-            if has_reply and reply_msg:
-                # 构建消息链：先引用，再发送文本
-                yield event.chain_result([reply_msg, Plain(result)])
-            else:
-                yield event.plain_result(result)
-            
-        except Exception as e:
-            logger.error(f"算卦过程出错: {e}")
-            yield event.plain_result(f"算卦时出现错误：{str(e)}\n请稍后再试。")
+            yield event.plain_result(result)
     
     @filter.command("卦象")
     async def hexagram_info(self, event: AstrMessageEvent):
-        """卦象查询 - 查询指定卦象的详细信息"""
+        """卦象查询"""
         message = event.message_str
         hexagram_name = message[2:].strip()
         
@@ -323,7 +299,7 @@ class SuanuaPlugin(Star):
     
     @filter.command("六十四卦")
     async def list_hexagrams(self, event: AstrMessageEvent):
-        """六十四卦列表 - 列出所有六十四卦名称"""
+        """六十四卦列表"""
         result = "【六十四卦列表】\n\n"
         
         hexagrams = list(SIXTY_FOUR_HEXAGRAMS.keys())
@@ -331,7 +307,7 @@ class SuanuaPlugin(Star):
             batch = hexagrams[i:i+8]
             result += "、".join(batch) + "\n"
         
-        result += "\n使用「卦象+卦名」查询详细信息，如：卦象乾"
+        result += "\n使用「卦象+卦名」查询详细信息"
         
         yield event.plain_result(result)
     
