@@ -227,20 +227,6 @@ class SuanuaPlugin(Star):
             logger.debug("函数工具已注册，跳过")
             return
         
-        @StarTools.register_llm_tool(
-            name="divine_hexagram",
-            description="易经算卦工具。当用户想要算卦、占卜、预测运势、询问未来时使用此工具。会随机生成一个六十四卦并给出解卦结果。",
-            parameters={
-                "type": "object",
-                "properties": {
-                    "question": {
-                        "type": "string",
-                        "description": "用户想要询问的问题或想要了解的方面（可选）"
-                    }
-                },
-                "required": []
-            }
-        )
         async def divine_hexagram(question: str = "") -> str:
             """算卦函数工具"""
             # 生成卦象
@@ -276,6 +262,20 @@ class SuanuaPlugin(Star):
                 result = f"求卦问题：{question}\n\n{result}"
             
             return result
+        
+        # 注册工具
+        StarTools.register_llm_tool(
+            name="divine_hexagram",
+            func_args=[
+                {
+                    "name": "question",
+                    "type": "string",
+                    "description": "用户想要询问的问题或想要了解的方面（可选）"
+                }
+            ],
+            desc="易经算卦工具。当用户想要算卦、占卜、预测运势、询问未来时使用此工具。会随机生成一个六十四卦并给出解卦结果。",
+            func_obj=divine_hexagram
+        )
         
         _tool_registered = True
         logger.info("算卦函数工具已注册")
