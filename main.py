@@ -6,7 +6,7 @@ AstrBot 算卦插件
 
 import random
 from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
+from astrbot.api.star import Context, Star
 from astrbot.api import logger
 from astrbot.api.message_components import Reply, Plain
 
@@ -112,13 +112,83 @@ SIXTY_FOUR_HEXAGRAMS = {
 }
 
 
-@register("astrbot_plugin_suanua", "86lbs", "易经算卦插件", "v1.0.0")
+def _pick_llm_text(llm_resp) -> str:
+    """从LLM响应中提取文本"""
+    # 1) 优先解析 AstrBot 的结果链
+    try:
+        rc = getattr(llm_resp, "result_chain", None)
+        chain = getattr(rc, "chain", None) if rc else None
+        if isinstance(chain, list) and chain:
+            parts = []
+            for seg in chain:
+                try:
+                    txt = getattr(seg, "text", None)
+                    if isinstance(txt, str) and txt.strip():
+                        parts.append(txt.strip())
+                except Exception:
+                    pass
+            if parts:
+                return "\n".join(parts).strip()
+    except Exception:
+        pass
+
+    # 2) 常见直接字段
+    for attr in ("completion_text", "text", "content", "message"):
+        try:
+            val = getattr(llm_resp, attr, None)
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        except Exception:
+            pass
+
+    # 3) 原始补全（OpenAI 风格）
+    try:
+        rawc = getattr(llm_resp, "raw_completion", None)
+        if rawc is not None:
+            choices = getattr(rawc, "choices", None)
+            if choices is None and isinstance(rawc, dict):
+                choices = rawc.get("choices")
+            if isinstance(choices, list) and choices:
+                first = choices[0]
+                if isinstance(first, dict):
+                    msg = first.get("message") or {}
+                    if isinstance(msg, dict):
+                        content = msg.get("content")
+                        if isinstance(content, str) and content.strip():
+                            return content.strip()
+                else:
+                    text = getattr(first, "text", None)
+                    if isinstance(text, str) and text.strip():
+                        return text.strip()
+    except Exception:
+        pass
+
+    # 4) 顶层 choices 兜底
+    try:
+        choices = getattr(llm_resp, "choices", None)
+        if isinstance(choices, list) and choices:
+            first = choices[0]
+            if isinstance(first, dict):
+                msg = first.get("message", {})
+                if isinstance(msg, dict):
+                    content = msg.get("content")
+                    if isinstance(content, str) and content.strip():
+                        return content.strip()
+            else:
+                text = getattr(first, "text", None)
+                if isinstance(text, str) and text.strip():
+                    return text.strip()
+    except Exception:
+        pass
+
+    return "（未解析到可读内容）"
+
+
 class SuanuaPlugin(Star):
     """算卦插件"""
     
     def __init__(self, context: Context):
         super().__init__(context)
-        self._support_ai = None
     
     async def initialize(self):
         """插件初始化"""
@@ -139,40 +209,39 @@ class SuanuaPlugin(Star):
                 return True, reply_text.strip(), msg
         return False, "", None
     
-    async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
+    async def _get_ai_interpretation(self, event: AstrMessageEvent, hexagram_name: str, hexagram_data: dict) -> str:
         """调用 AI 进行解卦"""
         try:
-            if self._support_ai is None:
-                self._support_ai = self.context.get_llm()
-            
-            if self._support_ai is None:
-                return "AI服务暂不可用，请稍后再试。"
-            
-            prompt = f"""你是一位精通易经的大师，请根据以下卦象为求卦者解卦。
+            # 获取当前会话的 provider
+            provider = self.context.get_using_provider(umo=event.unified_msg_origin)
+        except Exception as e:
+            logger.error(f"获取 provider 失败: {e}")
+            provider = None
+        
+        if not provider:
+            return "未检测到可用的大语言模型提供商，请先在 AstrBot 配置中启用。"
+        
+        # 构建提示词
+        user_prompt = f"""请根据以下卦象为求卦者解卦。
 
 卦名：{hexagram_name}
 卦象：{hexagram_data['卦象']}
 性质：{hexagram_data['性质']}
 基本含义：{hexagram_data['含义']}
 
-"""
-            if question:
-                prompt += f"求卦内容：{question}\n\n"
-            
-            prompt += """请提供详细的解卦分析，用通俗易懂的语言，给出积极正面的指引。"""
+请提供详细的解卦分析，用通俗易懂的语言，给出积极正面的指引。"""
 
-            response = await self._support_ai.chat_completion(
-                messages=[
-                    {"role": "system", "content": "你是一位精通易经的算命大师，擅长用通俗易懂的语言为人们解卦指引。"},
-                    {"role": "user", "content": prompt}
-                ]
+        system_prompt = "你是一位精通易经的算命大师，擅长用通俗易懂的语言为人们解卦指引。你的解读总是积极正面，给人希望和方向。"
+        
+        try:
+            # 使用 provider.text_chat 方法
+            llm_resp = await provider.text_chat(
+                prompt=user_prompt,
+                context=[],
+                system_prompt=system_prompt,
+                image_urls=[],
             )
-            
-            if response and hasattr(response, 'choices') and response.choices:
-                return response.choices[0].message.content
-            else:
-                return "AI解卦失败，请稍后再试。"
-                
+            return _pick_llm_text(llm_resp)
         except Exception as e:
             logger.error(f"AI 解卦失败: {e}")
             return f"AI解卦出错：{str(e)}"
@@ -209,8 +278,7 @@ class SuanuaPlugin(Star):
     @filter.command("算一卦")
     async def divine(self, event: AstrMessageEvent):
         """算一卦 - 生成卦象并输出本地解卦（不使用AI）"""
-        message = event.message_str
-        logger.info(f"收到算卦请求: {message}")
+        logger.info("收到算卦请求")
         
         # 生成卦象
         hexagram_name, hexagram_data = self._generate_hexagram()
@@ -231,8 +299,7 @@ class SuanuaPlugin(Star):
     @filter.command("ai解卦")
     async def ai_divine(self, event: AstrMessageEvent):
         """ai解卦 - 引用算卦结果进行AI解卦"""
-        message = event.message_str
-        logger.info(f"收到AI解卦请求: {message}")
+        logger.info("收到AI解卦请求")
         
         # 检查是否有引用消息
         has_reply, reply_content, reply_msg = self._get_reply_content(event)
@@ -254,11 +321,8 @@ class SuanuaPlugin(Star):
         
         hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
         
-        # 发送等待提示
-        await event.send(event.plain_result("正在为您AI解卦，请稍候..."))
-        
         # 调用AI解卦
-        ai_result = await self._get_ai_interpretation(hexagram_name, hexagram_data)
+        ai_result = await self._get_ai_interpretation(event, hexagram_name, hexagram_data)
         
         # 构建输出
         hexagram_display = get_hexagram_display(hexagram_data)

@@ -1,6 +1,6 @@
 name: astrbot_plugin_suanua
 display_name: 易经算卦
-desc: 易经算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
-version: v1.0.0
+desc: 易经算卦插件 - 用户发送"算一卦"触发，生成卦象，引用后发送"ai解卦"获取AI解读
+version: v1.1.0
 author: 86lbs
 repo: https://github.com/86lbs/astrbot_plugin_suanua
