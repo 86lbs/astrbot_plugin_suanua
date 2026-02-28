@@ -4,6 +4,7 @@ AstrBot 算卦插件
 """
 
 import random
+import re
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
@@ -80,9 +81,7 @@ SIXTY_FOUR_HEXAGRAMS = {
 
 @register("astrbot_plugin_suanua", "86lbs", "易经算卦插件 - 用户发送算一卦触发，生成卦象并调用AI解卦", "1.0.0")
 class SuanuaPlugin(Star):
-    """
-    算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
-    """
+    """算卦插件"""
     
     def __init__(self, context: Context):
         super().__init__(context)
@@ -192,8 +191,7 @@ class SuanuaPlugin(Star):
         
         return hexagram_name, hexagram_data, yao_results, changing_yao
 
-    # 使用正则匹配，支持直接发送"算一卦"触发
-    @filter.regex(r"^算一卦.*")
+    @filter.command("算一卦")
     async def divine(self, event: AstrMessageEvent):
         """算一卦 - 随机起卦并获取AI解卦结果"""
         message = event.message_str
@@ -231,7 +229,7 @@ class SuanuaPlugin(Star):
             logger.error(f"算卦过程出错: {e}")
             yield event.plain_result(f"❌ 算卦时出现错误：{str(e)}\n请稍后再试。")
     
-    @filter.regex(r"^卦象.+")
+    @filter.command("卦象")
     async def hexagram_info(self, event: AstrMessageEvent):
         """卦象查询 - 查询指定卦象的详细信息"""
         message = event.message_str
@@ -257,7 +255,7 @@ class SuanuaPlugin(Star):
         
         yield event.plain_result(result)
     
-    @filter.regex(r"^六十四卦$")
+    @filter.command("六十四卦")
     async def list_hexagrams(self, event: AstrMessageEvent):
         """六十四卦列表 - 列出所有六十四卦名称"""
         result = "📜 六十四卦列表：\n\n"
