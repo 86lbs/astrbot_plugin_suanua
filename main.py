@@ -269,8 +269,7 @@ class SuanuaPlugin(Star):
             func_args=[
                 {
                     "name": "question",
-                    "type": "string",
-                    "description": "用户想要询问的问题或想要了解的方面（可选）"
+                    "type": "string"
                 }
             ],
             desc="易经算卦工具。当用户想要算卦、占卜、预测运势、询问未来时使用此工具。会随机生成一个六十四卦并给出解卦结果。",
