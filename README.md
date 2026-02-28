@@ -86,10 +86,6 @@ git clone https://github.com/86lbs/astrbot_plugin_suanua.git
 2. AI 解卦结果由大语言模型生成，仅供参考
 3. 如遇问题，请检查 AstrBot 日志
 
-## 许可证
-
-MIT License
-
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
