@@ -2,6 +2,7 @@
 AstrBot 算卦插件
 用户发送 "算一卦" 触发本插件，生成卦象并输出本地解卦
 引用输出内容发送 "ai解卦" 进行AI解卦
+支持作为函数工具供 AI 调用
 """
 
 import random
@@ -9,6 +10,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star
 from astrbot.api import logger
 from astrbot.api.message_components import Reply
+from astrbot.core.star.star_tools import StarTools
 
 
 # 八卦线条映射
@@ -193,6 +195,67 @@ class SuanuaPlugin(Star):
     async def initialize(self):
         """插件初始化"""
         logger.info("算卦插件已加载")
+        
+        # 注册函数工具
+        self._register_tools()
+    
+    def _register_tools(self):
+        """注册函数工具供 AI 调用"""
+        
+        @StarTools.register_tool(
+            name="divine_hexagram",
+            description="易经算卦工具。当用户想要算卦、占卜、预测运势、询问未来时使用此工具。会随机生成一个六十四卦并给出解卦结果。",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "用户想要询问的问题或想要了解的方面（可选）"
+                    }
+                },
+                "required": []
+            }
+        )
+        async def divine_hexagram(question: str = "") -> str:
+            """
+            算卦函数工具
+            """
+            # 生成卦象
+            hexagram_name = random.choice(list(SIXTY_FOUR_HEXAGRAMS.keys()))
+            hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
+            hexagram_display = get_hexagram_display(hexagram_data)
+            
+            # 生成本地解卦
+            lines = []
+            lines.append(f"【{hexagram_name}卦】")
+            lines.append(hexagram_display)
+            lines.append(f"卦性：{hexagram_data['性质']}")
+            lines.append(f"含义：{hexagram_data['含义']}")
+            
+            yao_ci = random.choice(hexagram_data['爻辞'])
+            lines.append(f"爻辞：{yao_ci}")
+            
+            interpretations = [
+                "当前运势稳中有进，宜保持耐心。",
+                "事业方面：脚踏实地，稳扎稳打。",
+                "感情方面：真诚待人，缘分自来。",
+                "财运方面：量入为出，积少成多。",
+                "健康方面：劳逸结合，注意休息。"
+            ]
+            
+            lines.append("运势指引：")
+            for interp in random.sample(interpretations, 3):
+                lines.append(f"  • {interp}")
+            
+            result = "\n".join(lines)
+            
+            # 如果有问题，附加到结果中
+            if question:
+                result = f"求卦问题：{question}\n\n{result}"
+            
+            return result
+        
+        logger.info("算卦函数工具已注册")
     
     def _get_reply_content(self, event: AstrMessageEvent) -> tuple:
         """获取引用消息的内容"""
