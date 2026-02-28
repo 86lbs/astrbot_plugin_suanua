@@ -4,10 +4,8 @@ AstrBot 算卦插件
 """
 
 import random
-import asyncio
-from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
-from astrbot.api.star import Star, star_register, star_handler
-from astrbot.api.message_components import Plain
+from astrbot.api.star import Star, register
+from astrbot.api.event import AstrMessageEvent, MessageEventResult
 
 
 # 六十四卦数据
@@ -85,13 +83,14 @@ EIGHT_TRIGRAMS = {
 }
 
 
+@register("astrbot_plugin_suanua")
 class SuanuaPlugin(Star):
     """
     算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
     """
     
-    def __init__(self, context):
-        super().__init__(context)
+    def __init__(self, context, config=None):
+        super().__init__(context, config)
         self._support_ai = None
     
     async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
@@ -184,21 +183,6 @@ class SuanuaPlugin(Star):
         
         return interpretation
     
-    def _generate_hexagram(self) -> tuple:
-        """
-        生成随机卦象
-        使用传统的蓍草占卜法模拟
-        """
-        # 随机选择一个卦
-        hexagram_name = random.choice(list(SIXTY_FOUR_HEXAGRAMS.keys()))
-        hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
-        
-        # 生成卦象符号（上下卦组合）
-        upper_trigram = random.choice(list(EIGHT_TRIGRAMS.keys()))
-        lower_trigram = random.choice(list(EIGHT_TRIGRAMS.keys()))
-        
-        return hexagram_name, hexagram_data, EIGHT_TRIGRAMS[upper_trigram], EIGHT_TRIGRAMS[lower_trigram]
-    
     def _generate_detailed_hexagram(self) -> tuple:
         """
         生成详细的卦象（包含变爻）
@@ -229,24 +213,13 @@ class SuanuaPlugin(Star):
         
         return hexagram_name, hexagram_data, yao_results, changing_yao
 
-
-@star_register("suanua_plugin")
-class SuanuaPluginWrapper(SuanuaPlugin):
-    """
-    算卦插件包装类
-    """
-    
-    @star_handler("算一卦")
+    @register_command("算一卦")
     async def divine(self, event: AstrMessageEvent) -> MessageEventResult:
         """
         处理"算一卦"命令
         """
         # 获取消息内容
         message = event.get_message_str()
-        
-        # 检查是否触发命令
-        if "算一卦" not in message:
-            return MessageEventResult()
         
         self.logger.info(f"收到算卦请求: {message}")
         
@@ -288,15 +261,12 @@ class SuanuaPluginWrapper(SuanuaPlugin):
             self.logger.error(f"算卦过程出错: {e}")
             return MessageEventResult().message(f"❌ 算卦时出现错误：{str(e)}\n请稍后再试。")
     
-    @star_handler("卦象")
+    @register_command("卦象")
     async def hexagram_info(self, event: AstrMessageEvent) -> MessageEventResult:
         """
         查询卦象信息
         """
         message = event.get_message_str()
-        
-        if not message.startswith("卦象"):
-            return MessageEventResult()
         
         # 提取卦名
         hexagram_name = message[2:].strip()
@@ -320,16 +290,11 @@ class SuanuaPluginWrapper(SuanuaPlugin):
         
         return MessageEventResult().message(result)
     
-    @star_handler("六十四卦")
+    @register_command("六十四卦")
     async def list_hexagrams(self, event: AstrMessageEvent) -> MessageEventResult:
         """
         列出所有六十四卦
         """
-        message = event.get_message_str()
-        
-        if "六十四卦" not in message:
-            return MessageEventResult()
-        
         result = "📜 六十四卦列表：\n\n"
         
         hexagrams = list(SIXTY_FOUR_HEXAGRAMS.keys())
