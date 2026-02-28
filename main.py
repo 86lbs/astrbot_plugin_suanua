@@ -4,8 +4,9 @@ AstrBot 算卦插件
 """
 
 import random
-from astrbot.api.star import Star, register
-from astrbot.api.event import AstrMessageEvent, MessageEventResult
+from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.api.star import Context, Star, register
+from astrbot.api import logger
 
 
 # 六十四卦数据
@@ -68,7 +69,7 @@ SIXTY_FOUR_HEXAGRAMS = {
     "旅": {"卦象": "☲☶", "性质": "旅行", "含义": "旅途在外，小心谨慎。", "爻辞": ["初六：旅琐琐，斯其所取灾。", "六二：旅即次，怀其资，得童仆贞。", "九三：旅焚其次，丧其童仆，贞厉。", "九四：旅于处，得其资斧，我心不快。", "六五：射雉一矢亡，终以誉命。", "上九：鸟焚其巢，旅人先笑后号咷，丧牛于易，凶。"]},
     "巽": {"卦象": "☴☴", "性质": "顺从", "含义": "顺从谦逊，申命行事。", "爻辞": ["初六：进退，利武人之贞。", "九二：巽在床下，用史巫纷若，吉无咎。", "九三：频巽，吝。", "六四：悔亡，田获三品。", "九五：贞吉悔亡，无不利。无初有终，先庚三日，后庚三日，吉。", "上九：巽在床下，丧其资斧，贞凶。"]},
     "兑": {"卦象": "☱☱", "性质": "喜悦", "含义": "喜悦和乐，朋友讲习。", "爻辞": ["初九：和兑，吉。", "九二：孚兑，吉，悔亡。", "六三：来兑，凶。", "九四：商兑，未宁，介疾有喜。", "九五：孚于剥，有厉。", "上六：引兑。"]},
-    "涣": {"卦象": "☴☵", "性质": "离散", "含义": "离散涣散，拯弊救乱。", "爻辞": ["初六：用拯马壮，吉。", "九二：涣奔其机，悔亡。", "六三：涣其躬，无悔。", "六四：涣其群，元吉。涣有丘，匪夷所思。", "九五：涣汗其大号，涣王居，无咎。", "上九：涣其血，去逖出，无咎。"]},
+    "涣": {"卦象": "☴☵", "性质": "离散", "含义": "离散涣散，拯弊救乱。", "爻辞": ["初六：用拯马壮，吉。", "九二：涣奔其机，悔亡。", "六三：涣其躬，无悔。", "六四：涣其群，元吉。涣有丘，匪夷所思。", "九五：涣汗其大号，涣王居，无咎。", "上六：涣其血，去逖出，无咎。"]},
     "节": {"卦象": "☵☱", "性质": "节制", "含义": "节制适度，以制度量。", "爻辞": ["初九：不出户庭，无咎。", "九二：不出门庭，凶。", "六三：不节若，则嗟若，无咎。", "六四：安节，吉。", "九五：甘节，吉，往有尚。", "上六：苦节，贞凶，悔亡。"]},
     "中孚": {"卦象": "☴☱", "性质": "诚信", "含义": "诚信感通，信及豚鱼。", "爻辞": ["初九：虞吉，有它不燕。", "九二：鸣鹤在阴，其子和之，我有好爵，吾与尔靡之。", "六三：得敌，或鼓或罢，或泣或歌。", "六四：月几望，马匹亡，无咎。", "九五：有孚挛如，无咎。", "上九：翰音登于天，贞凶。"]},
     "小过": {"卦象": "☳☶", "性质": "小过度", "含义": "小有过越，飞鸟遗音。", "爻辞": ["初六：飞鸟以凶。", "六二：过其祖，遇其妣，不及其君，遇其臣，无咎。", "九三：弗过防之，从或戕之，凶。", "九四：无咎，弗过遇之，往厉必戒，勿用永贞。", "六五：密云不雨，自我西郊，公弋取彼在穴。", "上六：弗遇过之，飞鸟离之，凶，是谓灾眚。"]},
@@ -76,22 +77,20 @@ SIXTY_FOUR_HEXAGRAMS = {
     "未济": {"卦象": "☲☵", "性质": "未完成", "含义": "事业未成，继续努力。", "爻辞": ["初六：濡其尾，吝。", "九二：曳其轮，贞吉。", "六三：未济，征凶，利涉大川。", "九四：贞吉，悔亡，震用伐鬼方，三年有赏于大国。", "六五：贞吉，无悔，君子之光，有孚，吉。", "上九：有孚于饮酒，无咎，濡其首，有孚失是。"]}
 }
 
-# 八卦符号
-EIGHT_TRIGRAMS = {
-    "乾": "☰", "兑": "☱", "离": "☲", "震": "☳",
-    "巽": "☴", "坎": "☵", "艮": "☶", "坤": "☷"
-}
 
-
-@register("astrbot_plugin_suanua")
+@register("astrbot_plugin_suanua", "86lbs", "易经算卦插件 - 用户发送算一卦触发，生成卦象并调用AI解卦", "1.0.0")
 class SuanuaPlugin(Star):
     """
     算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
     """
     
-    def __init__(self, context, config=None):
-        super().__init__(context, config)
+    def __init__(self, context: Context):
+        super().__init__(context)
         self._support_ai = None
+    
+    async def initialize(self):
+        """插件初始化"""
+        logger.info("算卦插件已加载")
     
     async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
         """
@@ -142,7 +141,7 @@ class SuanuaPlugin(Star):
                 return self._generate_local_interpretation(hexagram_name, hexagram_data, question)
                 
         except Exception as e:
-            self.logger.error(f"AI 解卦失败: {e}")
+            logger.error(f"AI 解卦失败: {e}")
             return self._generate_local_interpretation(hexagram_name, hexagram_data, question)
     
     def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
@@ -193,8 +192,6 @@ class SuanuaPlugin(Star):
             # 模拟三次硬币抛掷
             coins = [random.choice([0, 1]) for _ in range(3)]
             total = sum(coins)
-            # 三正为老阳(9)，三阴为老阴(6)
-            # 二正一阴为少阳(7)，二阴一正为少阴(8)
             if total == 3:
                 yao_results.append(9)  # 老阳
             elif total == 0:
@@ -213,15 +210,15 @@ class SuanuaPlugin(Star):
         
         return hexagram_name, hexagram_data, yao_results, changing_yao
 
-    @register_command("算一卦")
-    async def divine(self, event: AstrMessageEvent) -> MessageEventResult:
+    @filter.command("算一卦")
+    async def divine(self, event: AstrMessageEvent):
         """
-        处理"算一卦"命令
+        算一卦 - 随机起卦并获取AI解卦结果
         """
         # 获取消息内容
-        message = event.get_message_str()
+        message = event.message_str
         
-        self.logger.info(f"收到算卦请求: {message}")
+        logger.info(f"收到算卦请求: {message}")
         
         # 提取问题（如果有）
         question = None
@@ -235,7 +232,7 @@ class SuanuaPlugin(Star):
             hexagram_name, hexagram_data, yao_results, changing_yao = self._generate_detailed_hexagram()
             
             # 发送等待提示
-            await event.send_message("🔮 正在为您起卦解卦，请稍候...")
+            await event.send(event.plain_result("🔮 正在为您起卦解卦，请稍候..."))
             
             # 调用 AI 解卦
             interpretation = await self._get_ai_interpretation(hexagram_name, hexagram_data, question)
@@ -255,25 +252,26 @@ class SuanuaPlugin(Star):
 💡 提示：卦象仅供参考，命运掌握在自己手中！
 """
             
-            return MessageEventResult().message(result)
+            yield event.plain_result(result)
             
         except Exception as e:
-            self.logger.error(f"算卦过程出错: {e}")
-            return MessageEventResult().message(f"❌ 算卦时出现错误：{str(e)}\n请稍后再试。")
+            logger.error(f"算卦过程出错: {e}")
+            yield event.plain_result(f"❌ 算卦时出现错误：{str(e)}\n请稍后再试。")
     
-    @register_command("卦象")
-    async def hexagram_info(self, event: AstrMessageEvent) -> MessageEventResult:
+    @filter.command("卦象")
+    async def hexagram_info(self, event: AstrMessageEvent):
         """
-        查询卦象信息
+        卦象查询 - 查询指定卦象的详细信息
         """
-        message = event.get_message_str()
+        message = event.message_str
         
         # 提取卦名
         hexagram_name = message[2:].strip()
         
         if hexagram_name not in SIXTY_FOUR_HEXAGRAMS:
             available = "、".join(list(SIXTY_FOUR_HEXAGRAMS.keys())[:8]) + "..."
-            return MessageEventResult().message(f"❌ 未找到「{hexagram_name}」卦\n可查询的卦象包括：{available}")
+            yield event.plain_result(f"❌ 未找到「{hexagram_name}」卦\n可查询的卦象包括：{available}")
+            return
         
         hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
         
@@ -288,12 +286,12 @@ class SuanuaPlugin(Star):
         for i, yao in enumerate(hexagram_data['爻辞'], 1):
             result += f"  {yao}\n"
         
-        return MessageEventResult().message(result)
+        yield event.plain_result(result)
     
-    @register_command("六十四卦")
-    async def list_hexagrams(self, event: AstrMessageEvent) -> MessageEventResult:
+    @filter.command("六十四卦")
+    async def list_hexagrams(self, event: AstrMessageEvent):
         """
-        列出所有六十四卦
+        六十四卦列表 - 列出所有六十四卦名称
         """
         result = "📜 六十四卦列表：\n\n"
         
@@ -304,4 +302,8 @@ class SuanuaPlugin(Star):
         
         result += "\n💡 使用「卦象+卦名」查询详细信息，如：卦象乾"
         
-        return MessageEventResult().message(result)
+        yield event.plain_result(result)
+    
+    async def terminate(self):
+        """插件销毁"""
+        logger.info("算卦插件已卸载")
