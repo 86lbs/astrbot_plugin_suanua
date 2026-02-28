@@ -1,12 +1,14 @@
 """
 AstrBot 算卦插件
 用户发送 "算一卦" 触发本插件，生成卦象并调用 AI 解卦
+支持引用消息帮别人算卦
 """
 
 import random
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
+from astrbot.api.message_components import Reply
 
 
 # 六十四卦数据
@@ -90,14 +92,38 @@ class SuanuaPlugin(Star):
         """插件初始化"""
         logger.info("算卦插件已加载")
     
-    async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
+    def _get_reply_content(self, event: AstrMessageEvent) -> tuple:
+        """
+        获取引用消息的内容
+        返回: (是否有引用, 引用消息内容, 引用者名称)
+        """
+        messages = event.get_messages()
+        for msg in messages:
+            if isinstance(msg, Reply):
+                # 获取引用消息的文本内容
+                reply_text = ""
+                if hasattr(msg, 'chain') and msg.chain:
+                    for comp in msg.chain:
+                        if hasattr(comp, 'text'):
+                            reply_text += comp.text
+                        elif hasattr(comp, 'plain'):
+                            reply_text += str(comp)
+                # 获取引用者名称
+                sender_name = ""
+                if hasattr(msg, 'sender') and msg.sender:
+                    sender_name = getattr(msg.sender, 'nickname', "") or getattr(msg.sender, 'name', "")
+                
+                return True, reply_text.strip(), sender_name
+        return False, "", ""
+    
+    async def _get_ai_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
         """调用 AI 进行解卦"""
         try:
             if self._support_ai is None:
                 self._support_ai = self.context.get_llm()
             
             if self._support_ai is None:
-                return self._generate_local_interpretation(hexagram_name, hexagram_data, question)
+                return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
             
             prompt = f"""你是一位精通易经的大师，请为求卦者解卦。
 
@@ -107,8 +133,11 @@ class SuanuaPlugin(Star):
 基本含义：{hexagram_data['含义']}
 
 """
+            if target_name:
+                prompt += f"求卦者：{target_name}\n"
+            
             if question:
-                prompt += f"求卦者的问题：{question}\n\n"
+                prompt += f"求卦内容：{question}\n\n"
             
             prompt += """请根据以上信息，为求卦者提供详细的解卦分析。请用通俗易懂的语言，给出积极正面的指引，帮助求卦者趋吉避凶。"""
 
@@ -122,21 +151,24 @@ class SuanuaPlugin(Star):
             if response and hasattr(response, 'choices') and response.choices:
                 return response.choices[0].message.content
             else:
-                return self._generate_local_interpretation(hexagram_name, hexagram_data, question)
+                return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
                 
         except Exception as e:
             logger.error(f"AI 解卦失败: {e}")
-            return self._generate_local_interpretation(hexagram_name, hexagram_data, question)
+            return self._generate_local_interpretation(hexagram_name, hexagram_data, question, target_name)
     
-    def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None) -> str:
+    def _generate_local_interpretation(self, hexagram_name: str, hexagram_data: dict, question: str = None, target_name: str = None) -> str:
         """本地生成解卦结果"""
         lines = []
         lines.append(f"【{hexagram_name}卦】{hexagram_data['卦象']}")
         lines.append(f"卦性：{hexagram_data['性质']}")
         lines.append(f"含义：{hexagram_data['含义']}")
         
+        if target_name:
+            lines.append(f"求卦者：{target_name}")
+        
         if question:
-            lines.append(f"问题：{question}")
+            lines.append(f"求卦内容：{question}")
         
         yao_ci = random.choice(hexagram_data['爻辞'])
         lines.append(f"爻辞：{yao_ci}")
@@ -178,28 +210,44 @@ class SuanuaPlugin(Star):
 
     @filter.command("算一卦")
     async def divine(self, event: AstrMessageEvent):
-        """算一卦 - 随机起卦并获取AI解卦结果"""
+        """算一卦 - 随机起卦并获取AI解卦结果，支持引用消息帮别人算卦"""
         message = event.message_str
         logger.info(f"收到算卦请求: {message}")
         
+        # 检查是否有引用消息
+        has_reply, reply_content, reply_sender = self._get_reply_content(event)
+        
         question = None
-        if len(message) > 3:
-            question = message[3:].strip()
-            if question.startswith("算一卦"):
-                question = question[3:].strip()
+        target_name = None
+        
+        if has_reply and reply_content:
+            # 有引用消息，帮别人算卦
+            target_name = reply_sender if reply_sender else "某人"
+            question = reply_content
+            logger.info(f"帮 {target_name} 算卦，内容: {question}")
+        else:
+            # 没有引用消息，正常算卦
+            if len(message) > 3:
+                question = message[3:].strip()
+                if question.startswith("算一卦"):
+                    question = question[3:].strip()
         
         try:
             hexagram_name, hexagram_data, yao_results, changing_yao = self._generate_detailed_hexagram()
             
             await event.send(event.plain_result("正在为您起卦解卦，请稍候..."))
             
-            interpretation = await self._get_ai_interpretation(hexagram_name, hexagram_data, question)
+            interpretation = await self._get_ai_interpretation(hexagram_name, hexagram_data, question, target_name)
             
-            # 简洁清晰的输出格式
-            result = f"【易经算卦】\n\n"
+            # 构建输出
+            result = "【易经算卦】\n\n"
             result += f"卦名：{hexagram_name}卦 {hexagram_data['卦象']}\n"
-            result += f"卦性：{hexagram_data['性质']}\n\n"
-            result += f"【解卦】\n{interpretation}\n\n"
+            result += f"卦性：{hexagram_data['性质']}\n"
+            
+            if target_name:
+                result += f"求卦者：{target_name}\n"
+            
+            result += f"\n【解卦】\n{interpretation}\n\n"
             result += "提示：卦象仅供参考，命运掌握在自己手中！"
             
             yield event.plain_result(result)
