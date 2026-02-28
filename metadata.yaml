@@ -1,0 +1,16 @@
+name: suanua_plugin
+version: 1.0.0
+description: 易经算卦插件 - 用户发送"算一卦"触发，生成卦象并调用AI解卦
+author: 86lbs
+repo: https://github.com/86lbs/astrbot_plugin_suanua
+license: MIT
+keywords:
+  - 算卦
+  - 易经
+  - 六十四卦
+  - 占卜
+  - AI解卦
+commands:
+  - 算一卦
+  - 卦象
+  - 六十四卦
