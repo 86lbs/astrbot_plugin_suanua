@@ -227,7 +227,7 @@ class SuanuaPlugin(Star):
             logger.debug("函数工具已注册，跳过")
             return
         
-        @StarTools.register_tool(
+        @StarTools.register_llm_tool(
             name="divine_hexagram",
             description="易经算卦工具。当用户想要算卦、占卜、预测运势、询问未来时使用此工具。会随机生成一个六十四卦并给出解卦结果。",
             parameters={
