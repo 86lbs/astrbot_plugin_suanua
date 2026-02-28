@@ -1,10 +1,10 @@
-# AstrBot 算卦插件 🔮
+# [AstrBot](https://astrbot.app) 算卦插件 🔮
 
-一个基于易经六十四卦的 AstrBot 聊天机器人插件，支持 AI 智能解卦。
+一个基于易经六十四卦的 [AstrBot](https://astrbot.app) 聊天机器人插件，支持 AI 智能解卦。
 
 ## 免责声明
 
-插件开发全程由智谱清言agent完成
+插件开发全程均由 智谱清言agent 完成
 
 ## 功能特点
 
@@ -13,35 +13,23 @@
 - 📖 **卦象查询**：支持查询六十四卦详细信息
 - 💬 **简单易用**：只需发送"算一卦"即可触发
 
-## 安装方法
+## 安装方式
 
 ### 方法一：通过 AstrBot 插件市场安装
 
 1. 打开 AstrBot 管理面板
 2. 进入插件市场
-3. 搜索"算卦"或"suanua"
-4. 点击安装
+3. 搜索关键词 "算卦" 或 "suanua"
+4. 安装
 
-### 方法二：通过 URL 安装
-
-1. 打开 AstrBot 管理面板
-2. 进入插件管理
-3. 点击"安装插件"
-4. 输入仓库地址：`https://github.com/86lbs/astrbot_plugin_suanua`
-5. 点击安装
-
-### 方法三：手动安装
+### 方法二：手动安装
 
 1. 下载本仓库
 ```bash
 git clone https://github.com/86lbs/astrbot_plugin_suanua.git
 ```
 
-2. 将 `main.py` 和 `metadata.yaml` 复制到 AstrBot 的 `data/plugins/astrbot_plugin_suanua/` 目录
-```bash
-mkdir -p /path/to/astrbot/data/plugins/astrbot_plugin_suanua
-cp main.py metadata.yaml /path/to/astrbot/data/plugins/astrbot_plugin_suanua/
-```
+2. 将下载的文件复制到 AstrBot 的  `data/plugins` 目录
 
 3. 重启 AstrBot
 
@@ -76,7 +64,7 @@ cp main.py metadata.yaml /path/to/astrbot/data/plugins/astrbot_plugin_suanua/
 
 ## 配置说明
 
-插件会自动使用 AstrBot 配置的 AI 模型进行解卦。如果 AI 不可用，将使用本地预设的解卦模板。
+插件会自动使用 AstrBot 配置的 LLM 模型进行解卦。如果 LLM 不可用，将使用本地预设的解卦模板。
 
 ## 六十四卦列表
 
@@ -90,7 +78,7 @@ cp main.py metadata.yaml /path/to/astrbot/data/plugins/astrbot_plugin_suanua/
 
 - **起卦算法**：模拟传统蓍草占卜法，通过随机数生成六爻
 - **AI 解卦**：调用 AstrBot 的 LLM 接口，根据卦象生成个性化解读
-- **本地降级**：当 AI 不可用时，使用预设模板进行解卦
+- **本地降级**：当 LLM 不可用时，使用预设模板进行解卦
 
 ## 注意事项
 
@@ -105,7 +93,3 @@ MIT License
 ## 贡献
 
 欢迎提交 Issue 和 Pull Request！
-
-## 仓库地址
-
-🔗 https://github.com/86lbs/astrbot_plugin_suanua
