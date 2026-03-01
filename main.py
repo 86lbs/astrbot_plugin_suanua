@@ -235,6 +235,12 @@ class SuanuaPlugin(Star):
                 question: 用户想要询问的问题（可选）
                 **kwargs: 其他参数
             """
+            # 检查是否有引用消息
+            has_reply, reply_content = self._get_reply_content(event)
+            if has_reply and reply_content:
+                # 如果有引用消息，使用引用消息作为求卦内容
+                question = reply_content
+            
             # 生成卦象
             hexagram_name = random.choice(list(SIXTY_FOUR_HEXAGRAMS.keys()))
             hexagram_data = SIXTY_FOUR_HEXAGRAMS[hexagram_name]
