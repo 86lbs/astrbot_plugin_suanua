@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from astrbot.api import llm_tool, logger, star
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, MessageEventResult, filter
 from astrbot.api.message_components import Reply
 from astrbot.api.star import Context
 
@@ -481,7 +481,7 @@ class SuanguaPlugin(star.Star):
         )
         result += "\r\n\r\n引用此消息发送「ai解卦」可获取AI详细解读"
         
-        yield event.plain_result(result)
+        yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("变卦")
     async def divine_with_change(self, event: AstrMessageEvent):
@@ -505,7 +505,7 @@ class SuanguaPlugin(star.Star):
         )
         result += "\r\n\r\n引用此消息发送「ai解卦」可获取AI详细解读"
         
-        yield event.plain_result(result)
+        yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("ai解卦")
     async def ai_divine(self, event: AstrMessageEvent):
@@ -554,7 +554,7 @@ class SuanguaPlugin(star.Star):
         
         result += f"\r\n{ai_result}"
         
-        yield event.plain_result(result)
+        yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("卦象")
     async def hexagram_info(self, event: AstrMessageEvent, name: str = ""):
@@ -585,7 +585,7 @@ class SuanguaPlugin(star.Star):
         for yao in hexagram_data.get('爻辞', []):
             result += f"  {yao}\r\n"
         
-        yield event.plain_result(result)
+        yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("六十四卦")
     async def list_hexagrams(self, event: AstrMessageEvent):
@@ -603,7 +603,7 @@ class SuanguaPlugin(star.Star):
         
         result += "\r\n使用「卦象+卦名」查询详细信息"
         
-        yield event.plain_result(result)
+        yield MessageEventResult().message(result).use_t2i(False)
     
     async def terminate(self):
         """插件销毁"""
