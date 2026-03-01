@@ -25,18 +25,6 @@ TRIGRAM_LINES = {
     "☴": ["━ ━", "━━━", "━━━"],  # 巽 - 初阴
 }
 
-# 八卦符号到名称的映射（用于单卦显示）
-TRIGRAM_NAMES = {
-    "☰": "乾",
-    "☷": "坤",
-    "☳": "震",
-    "☶": "艮",
-    "☲": "离",
-    "☵": "坎",
-    "☱": "兑",
-    "☴": "巽",
-}
-
 
 def get_hexagram_display(hexagram_data: dict) -> str:
     """将卦象转换为六行显示格式（六十四卦都是重卦，共六爻）"""
@@ -129,9 +117,6 @@ SIXTY_FOUR_HEXAGRAMS = {
     "未济": {"卦象": "☲☵", "性质": "未完成", "含义": "事业未成，继续努力。", "爻辞": ["初六：濡其尾，吝。", "九二：曳其轮，贞吉。", "六三：未济，征凶，利涉大川。", "九四：贞吉，悔亡，震用伐鬼方，三年有赏于大国。", "六五：贞吉，无悔，君子之光，有孚，吉。", "上九：有孚于饮酒，无咎，濡其首，有孚失是。"]}
 }
 
-# 工具是否已注册的标志
-_tool_registered = False
-
 
 def _pick_llm_text(llm_resp) -> str:
     """从LLM响应中提取文本"""
@@ -146,11 +131,11 @@ def _pick_llm_text(llm_resp) -> str:
                     txt = getattr(seg, "text", None)
                     if isinstance(txt, str) and txt.strip():
                         parts.append(txt.strip())
-                except Exception as e:
+                except (AttributeError, TypeError) as e:
                     logger.debug(f"解析结果链时出错: {e}")
             if parts:
                 return "\n".join(parts).strip()
-    except Exception as e:
+    except (AttributeError, TypeError) as e:
         logger.debug(f"解析 result_chain 时出错: {e}")
 
     # 2) 常见直接字段
@@ -159,7 +144,7 @@ def _pick_llm_text(llm_resp) -> str:
             val = getattr(llm_resp, attr, None)
             if isinstance(val, str) and val.strip():
                 return val.strip()
-        except Exception as e:
+        except (AttributeError, TypeError) as e:
             logger.debug(f"获取属性 {attr} 时出错: {e}")
 
     # 3) 原始补全（OpenAI 风格）
@@ -181,7 +166,7 @@ def _pick_llm_text(llm_resp) -> str:
                     text = getattr(first, "text", None)
                     if isinstance(text, str) and text.strip():
                         return text.strip()
-    except Exception as e:
+    except (AttributeError, TypeError, KeyError, IndexError) as e:
         logger.debug(f"解析 raw_completion 时出错: {e}")
 
     # 4) 顶层 choices 兜底
@@ -199,31 +184,28 @@ def _pick_llm_text(llm_resp) -> str:
                 text = getattr(first, "text", None)
                 if isinstance(text, str) and text.strip():
                     return text.strip()
-    except Exception as e:
+    except (AttributeError, TypeError, KeyError, IndexError) as e:
         logger.debug(f"解析 choices 时出错: {e}")
 
     logger.warning("未能从 LLM 响应中解析到文本内容")
     return "（未解析到可读内容）"
 
 
-class SuanuaPlugin(Star):
+class SuanguaPlugin(Star):
     """算卦插件"""
     
     def __init__(self, context: Context):
         super().__init__(context)
+        self._tool_registered = False
     
     async def initialize(self):
         """插件初始化"""
         logger.info("算卦插件已加载")
-        
-        # 注册函数工具（使用全局标志防止重复注册）
         self._register_tools()
     
     def _register_tools(self):
         """注册函数工具供 AI 调用"""
-        global _tool_registered
-        
-        if _tool_registered:
+        if self._tool_registered:
             logger.debug("函数工具已注册，跳过")
             return
         
@@ -238,7 +220,6 @@ class SuanuaPlugin(Star):
             # 检查是否有引用消息
             has_reply, reply_content = self._get_reply_content(event)
             if has_reply and reply_content:
-                # 如果有引用消息，使用引用消息作为求卦内容
                 question = reply_content
             
             # 生成卦象
@@ -288,7 +269,7 @@ class SuanuaPlugin(Star):
             func_obj=divine_hexagram
         )
         
-        _tool_registered = True
+        self._tool_registered = True
         logger.info("算卦函数工具已注册")
     
     def _get_reply_content(self, event: AstrMessageEvent) -> tuple:
@@ -296,7 +277,7 @@ class SuanuaPlugin(Star):
         messages = event.get_messages()
         for msg in messages:
             if isinstance(msg, Reply):
-                # 优先使用 message_str 字段（被引用消息解析后的纯文本）
+                # 优先使用 message_str 字段
                 if hasattr(msg, 'message_str') and isinstance(msg.message_str, str) and msg.message_str.strip():
                     return True, msg.message_str.strip()
                 
@@ -304,7 +285,6 @@ class SuanuaPlugin(Star):
                 reply_text = ""
                 if hasattr(msg, 'chain') and msg.chain:
                     for comp in msg.chain:
-                        # 处理 Plain 组件
                         if hasattr(comp, 'text') and isinstance(comp.text, str):
                             reply_text += comp.text
                 if reply_text.strip():
@@ -316,7 +296,7 @@ class SuanuaPlugin(Star):
         """调用 AI 进行解卦"""
         try:
             provider = self.context.get_using_provider(umo=event.unified_msg_origin)
-        except Exception as e:
+        except (AttributeError, ValueError) as e:
             logger.error(f"获取 provider 失败: {e}")
             provider = None
         
@@ -342,7 +322,7 @@ class SuanuaPlugin(Star):
                 image_urls=[],
             )
             return _pick_llm_text(llm_resp)
-        except Exception as e:
+        except (AttributeError, TypeError, ValueError) as e:
             logger.error(f"AI 解卦失败: {e}")
             return f"AI解卦出错：{str(e)}"
     
@@ -360,7 +340,6 @@ class SuanuaPlugin(Star):
         hexagram_name, hexagram_data = self._generate_hexagram()
         hexagram_display = get_hexagram_display(hexagram_data)
         
-        # 构建输出（避免重复）
         result = f"【{hexagram_name}卦】\n"
         result += f"{hexagram_display}\n"
         result += f"卦性：{hexagram_data['性质']}\n"
@@ -421,12 +400,26 @@ class SuanuaPlugin(Star):
         yield event.plain_result(result)
     
     @filter.command("卦象")
-    async def hexagram_info(self, event: AstrMessageEvent):
-        """卦象查询"""
-        message = event.message_str
-        hexagram_name = message[2:].strip()
+    async def hexagram_info(self, event: AstrMessageEvent, name: str = ""):
+        """卦象查询
         
-        if hexagram_name not in SIXTY_FOUR_HEXAGRAMS:
+        Args:
+            event: 事件对象
+            name: 卦名（可选，从命令参数获取）
+        """
+        # 使用框架提供的参数绑定
+        hexagram_name = name.strip() if name else ""
+        
+        # 如果参数为空，尝试从消息中解析
+        if not hexagram_name:
+            message = event.message_str
+            # 移除命令前缀
+            for prefix in ["卦象", "卦象 "]:
+                if message.startswith(prefix):
+                    hexagram_name = message[len(prefix):].strip()
+                    break
+        
+        if not hexagram_name or hexagram_name not in SIXTY_FOUR_HEXAGRAMS:
             available = "、".join(list(SIXTY_FOUR_HEXAGRAMS.keys())[:8]) + "..."
             yield event.plain_result(f"未找到「{hexagram_name}」卦\n可查询的卦象包括：{available}")
             return
