@@ -47,7 +47,10 @@ YAO_NAMES = ["初爻", "二爻", "三爻", "四爻", "五爻", "上爻"]
 
 
 def get_hexagram_display(hexagram_data: dict) -> str:
-    """将卦象转换为六行显示格式"""
+    """将卦象转换为六行显示格式
+    
+    显示顺序：从上到下（上爻到初爻）
+    """
     gua_xiang = hexagram_data.get("卦象", "")
     
     if not gua_xiang:
@@ -55,12 +58,18 @@ def get_hexagram_display(hexagram_data: dict) -> str:
     
     if len(gua_xiang) == 1 and gua_xiang in TRIGRAM_LINES:
         lines = TRIGRAM_LINES[gua_xiang]
-        return "\n".join(lines + lines)
+        # 显示顺序：上卦在上，下卦在下
+        # 但六爻显示是从上到下，所以需要反转
+        all_lines = lines + lines  # 下卦 + 上卦
+        return "\n".join(reversed(all_lines))
     
     if len(gua_xiang) == 2:
+        # gua_xiang[0]=上卦，gua_xiang[1]=下卦
         upper_lines = TRIGRAM_LINES.get(gua_xiang[0], ["?", "?", "?"])
         lower_lines = TRIGRAM_LINES.get(gua_xiang[1], ["?", "?", "?"])
-        return "\n".join(upper_lines + lower_lines)
+        # 显示顺序：上爻到初爻
+        all_lines = lower_lines + upper_lines  # 下卦 + 上卦
+        return "\n".join(reversed(all_lines))
     
     return gua_xiang
 
@@ -79,17 +88,24 @@ def validate_hexagram_data(data: dict, name: str) -> bool:
 
 
 def get_hexagram_lines(hexagram_data: dict) -> list[str]:
-    """获取卦象的六爻线条列表"""
+    """获取卦象的六爻线条列表
+    
+    返回顺序：索引0=初爻，索引5=上爻
+    """
     gua_xiang = hexagram_data.get("卦象", "")
     
     if len(gua_xiang) == 1 and gua_xiang in TRIGRAM_LINES:
+        # 纯卦：下卦和上卦相同
         lines = TRIGRAM_LINES[gua_xiang]
+        # 下卦（初爻、二爻、三爻）+ 上卦（四爻、五爻、上爻）
         return lines + lines
     
     if len(gua_xiang) == 2:
+        # gua_xiang[0]=上卦，gua_xiang[1]=下卦
         upper_lines = TRIGRAM_LINES.get(gua_xiang[0], ["?", "?", "?"])
         lower_lines = TRIGRAM_LINES.get(gua_xiang[1], ["?", "?", "?"])
-        return upper_lines + lower_lines
+        # 下卦 + 上卦
+        return lower_lines + upper_lines
     
     return ["?"] * 6
 
@@ -114,14 +130,16 @@ def find_hexagram_by_lines(lines: list[str], hexagrams: dict) -> Optional[tuple[
     if len(lines) != 6:
         return None
     
-    # 分为上下卦
-    upper_lines = lines[0:3]  # 上卦（4、5、6爻）
-    lower_lines = lines[3:6]  # 下卦（1、2、3爻）
+    # 六爻顺序：索引0=初爻，索引5=上爻
+    # 下卦 = 初爻、二爻、三爻 = 索引 0,1,2
+    # 上卦 = 四爻、五爻、上爻 = 索引 3,4,5
+    lower_lines = lines[0:3]  # 下卦（初爻、二爻、三爻）
+    upper_lines = lines[3:6]  # 上卦（四爻、五爻、上爻）
     
-    upper_symbol = lines_to_trigram_symbol(upper_lines)
     lower_symbol = lines_to_trigram_symbol(lower_lines)
+    upper_symbol = lines_to_trigram_symbol(upper_lines)
     
-    # 查找对应的卦
+    # 查找对应的卦（卦象格式：上卦符号+下卦符号）
     for name, data in hexagrams.items():
         gua_xiang = data.get("卦象", "")
         if len(gua_xiang) == 1:
@@ -129,6 +147,7 @@ def find_hexagram_by_lines(lines: list[str], hexagrams: dict) -> Optional[tuple[
             if gua_xiang == upper_symbol == lower_symbol:
                 return name, data
         elif len(gua_xiang) == 2:
+            # 卦象格式：gua_xiang[0]=上卦，gua_xiang[1]=下卦
             if gua_xiang[0] == upper_symbol and gua_xiang[1] == lower_symbol:
                 return name, data
     
