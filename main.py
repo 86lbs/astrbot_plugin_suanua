@@ -460,7 +460,7 @@ class SuanguaPlugin(star.Star):
         )
     
     @filter.command("算一卦")
-    async def divine(self, event: AstrMessageEvent):
+    async def divine(self, event: AstrMessageEvent, *args, **kwargs):
         """算一卦 - 生成卦象并输出本地解卦"""
         logger.info("收到算卦请求")
         
@@ -484,7 +484,7 @@ class SuanguaPlugin(star.Star):
         yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("变卦")
-    async def divine_with_change(self, event: AstrMessageEvent):
+    async def divine_with_change(self, event: AstrMessageEvent, *args, **kwargs):
         """变卦 - 强制生成带变卦的算卦结果"""
         logger.info("收到变卦请求")
         
@@ -508,7 +508,7 @@ class SuanguaPlugin(star.Star):
         yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("ai解卦")
-    async def ai_divine(self, event: AstrMessageEvent):
+    async def ai_divine(self, event: AstrMessageEvent, *args, **kwargs):
         """ai解卦 - 引用算卦结果进行AI解卦"""
         logger.info("收到AI解卦请求")
         
@@ -588,7 +588,7 @@ class SuanguaPlugin(star.Star):
         yield MessageEventResult().message(result).use_t2i(False)
     
     @filter.command("六十四卦")
-    async def list_hexagrams(self, event: AstrMessageEvent):
+    async def list_hexagrams(self, event: AstrMessageEvent, *args, **kwargs):
         """六十四卦列表"""
         if not self._hexagrams:
             yield event.plain_result("卦象数据加载失败，请联系管理员检查插件配置。")
