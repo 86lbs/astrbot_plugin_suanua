@@ -227,12 +227,13 @@ class SuanuaPlugin(Star):
             logger.debug("函数工具已注册，跳过")
             return
         
-        async def divine_hexagram(question: str = "", **kwargs) -> str:
+        async def divine_hexagram(event: AstrMessageEvent, question: str = "", **kwargs) -> str:
             """算卦函数工具
             
             Args:
+                event: AstrBot 传递的事件对象
                 question: 用户想要询问的问题（可选）
-                **kwargs: AstrBot 传递的额外参数 (event, context)
+                **kwargs: 其他参数
             """
             # 生成卦象
             hexagram_name = random.choice(list(SIXTY_FOUR_HEXAGRAMS.keys()))
