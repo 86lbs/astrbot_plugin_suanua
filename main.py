@@ -289,18 +289,20 @@ class SuanuaPlugin(Star):
         messages = event.get_messages()
         for msg in messages:
             if isinstance(msg, Reply):
+                # 优先使用 message_str 字段（被引用消息解析后的纯文本）
+                if hasattr(msg, 'message_str') and isinstance(msg.message_str, str) and msg.message_str.strip():
+                    return True, msg.message_str.strip()
+                
+                # 回退：遍历 chain 获取文本
                 reply_text = ""
                 if hasattr(msg, 'chain') and msg.chain:
                     for comp in msg.chain:
-                        # 正确获取文本内容
+                        # 处理 Plain 组件
                         if hasattr(comp, 'text') and isinstance(comp.text, str):
                             reply_text += comp.text
-                        # 处理 Plain 组件
-                        elif hasattr(comp, 'plain') and comp.plain is not None:
-                            plain_text = getattr(comp.plain, 'text', None)
-                            if isinstance(plain_text, str):
-                                reply_text += plain_text
-                return True, reply_text.strip()
+                if reply_text.strip():
+                    return True, reply_text.strip()
+                
         return False, ""
     
     async def _get_ai_interpretation(self, event: AstrMessageEvent, hexagram_name: str, hexagram_data: dict) -> str:
