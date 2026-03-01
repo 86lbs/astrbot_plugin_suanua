@@ -346,8 +346,11 @@ class SuanguaPlugin(star.Star):
         
         result = "\n".join(lines)
         
+        # 确保换行符正确显示
+        result = result.replace("\n", "\r\n")
+        
         if question:
-            result = f"求卦问题：{question}\n\n{result}"
+            result = f"求卦问题：{question}\r\n\r\n{result}"
         
         return result
     
@@ -476,7 +479,7 @@ class SuanguaPlugin(star.Star):
             include_change=self._config["enable_change"],
             compact=False
         )
-        result += "\n\n引用此消息发送「ai解卦」可获取AI详细解读"
+        result += "\r\n\r\n引用此消息发送「ai解卦」可获取AI详细解读"
         
         yield event.plain_result(result)
     
@@ -500,7 +503,7 @@ class SuanguaPlugin(star.Star):
             include_change=True,
             compact=False
         )
-        result += "\n\n引用此消息发送「ai解卦」可获取AI详细解读"
+        result += "\r\n\r\n引用此消息发送「ai解卦」可获取AI详细解读"
         
         yield event.plain_result(result)
     
@@ -542,14 +545,14 @@ class SuanguaPlugin(star.Star):
         )
         
         hexagram_display = get_hexagram_display(hexagram_data, compact=False)
-        result = f"【{hexagram_name}卦 · AI解卦】\n"
-        result += f"{hexagram_display}\n"
-        result += f"卦性：{hexagram_data.get('性质', '未知')}\n"
+        result = f"【{hexagram_name}卦 · AI解卦】\r\n"
+        result += f"{hexagram_display}\r\n"
+        result += f"卦性：{hexagram_data.get('性质', '未知')}\r\n"
         
         if changed_name and changed_data:
-            result += f"\n变卦：{changed_name}卦\n"
+            result += f"\r\n变卦：{changed_name}卦\r\n"
         
-        result += f"\n{ai_result}"
+        result += f"\r\n{ai_result}"
         
         yield event.plain_result(result)
     
@@ -574,13 +577,13 @@ class SuanguaPlugin(star.Star):
         hexagram_data = self._hexagrams[hexagram_name]
         hexagram_display = get_hexagram_display(hexagram_data, compact=False)
         
-        result = f"【{hexagram_name}卦】\n"
-        result += f"{hexagram_display}\n\n"
-        result += f"性质：{hexagram_data.get('性质', '未知')}\n"
-        result += f"含义：{hexagram_data.get('含义', '未知')}\n\n"
-        result += "爻辞：\n"
+        result = f"【{hexagram_name}卦】\r\n"
+        result += f"{hexagram_display}\r\n\r\n"
+        result += f"性质：{hexagram_data.get('性质', '未知')}\r\n"
+        result += f"含义：{hexagram_data.get('含义', '未知')}\r\n\r\n"
+        result += "爻辞：\r\n"
         for yao in hexagram_data.get('爻辞', []):
-            result += f"  {yao}\n"
+            result += f"  {yao}\r\n"
         
         yield event.plain_result(result)
     
@@ -591,14 +594,14 @@ class SuanguaPlugin(star.Star):
             yield event.plain_result("卦象数据加载失败，请联系管理员检查插件配置。")
             return
         
-        result = "【六十四卦列表】\n\n"
+        result = "【六十四卦列表】\r\n\r\n"
         
         hexagrams = list(self._hexagrams.keys())
         for i in range(0, len(hexagrams), 8):
             batch = hexagrams[i:i+8]
-            result += "、".join(batch) + "\n"
+            result += "、".join(batch) + "\r\n"
         
-        result += "\n使用「卦象+卦名」查询详细信息"
+        result += "\r\n使用「卦象+卦名」查询详细信息"
         
         yield event.plain_result(result)
     

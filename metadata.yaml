@@ -1,6 +1,6 @@
 name: astrbot_plugin_suanua
 display_name: 易经算卦
 desc: 易经六十四卦算卦插件，支持命令触发、AI函数工具调用和变卦功能
-version: v2.3.2
+version: v2.3.3
 author: z-ai & 申辰
 repo: https://github.com/86lbs/astrbot_plugin_suanua
